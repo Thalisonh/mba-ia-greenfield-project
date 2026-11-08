@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 7/12 completed
+**SIs:** 8/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -53,9 +53,11 @@
   - Beyond the plan: if the enqueue fails after `markProcessing`, the video is marked `failed` and the error propagates, otherwise it would stay in `processing` forever.
 
 ### SI-03.8 — Runtime do worker de vídeo e integração com FFmpeg
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 5/5 passing (ffmpeg.service.integration-spec.ts); app.e2e-spec.ts 1/1 passing; video-worker container running
+- **Observations:** 
+  - Beyond the plan (security): uploaded files are untrusted, so FFmpeg runs with `-protocol_whitelist` and `-format_whitelist` (a playlist could otherwise point FFmpeg at local files or internal hosts), and the signed URL is masked in error messages because they end up in `processing_error`.
+  - Added `InvalidMediaError` so SI-03.9 can tell unusable files from transient I/O failures.
 
 ### SI-03.9 — Processamento no worker: metadados, thumbnail e ciclo de status
 - **Status:** pending
