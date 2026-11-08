@@ -37,9 +37,6 @@ describe('Videos upload (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app
-      .get<Queue>(getQueueToken(VIDEO_PROCESSING_QUEUE))
-      .obliterate({ force: true });
     await cleanAllTables(app.get(DataSource));
     await app.close();
   });

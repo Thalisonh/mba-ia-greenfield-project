@@ -118,3 +118,63 @@ Content-Type: {{contentType}}
   "token": "{{resetToken}}",
   "new_password": "new-password123"
 }
+
+
+###
+# ─────────────────────────────────────────────
+# VÍDEOS
+# ─────────────────────────────────────────────
+# Depois do passo 10, envie cada parte com PUT direto na URL recebida
+# (ex.: curl -T parte.bin "<url>") e guarde o header ETag da resposta.
+
+@videoId = cole-o-id-do-video-aqui
+@videoSlug = cole-o-slug-do-video-aqui
+
+### 10. Iniciar upload (cria o rascunho e abre o multipart)
+POST {{baseUrl}}/videos
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "filename": "aula.mp4",
+  "content_type": "video/mp4",
+  "size": 1048576
+}
+
+
+### 11. URLs pré-assinadas das partes
+GET {{baseUrl}}/videos/{{videoId}}/upload/parts?from=1&to=1
+Authorization: Bearer {{accessToken}}
+
+
+### 12. Concluir o upload e enfileirar o processamento
+POST {{baseUrl}}/videos/{{videoId}}/upload/complete
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "parts": [{ "part_number": 1, "etag": "cole-o-etag-aqui" }]
+}
+
+
+### 13. Acompanhar o status (draft → processing → ready | failed)
+GET {{baseUrl}}/videos/{{videoId}}
+Authorization: Bearer {{accessToken}}
+
+
+### 14. Streaming com Range
+GET {{baseUrl}}/videos/{{videoSlug}}/stream
+Range: bytes=0-1023
+
+
+### 15. Download
+GET {{baseUrl}}/videos/{{videoSlug}}/download
+
+
+### 16. Thumbnail
+GET {{baseUrl}}/videos/{{videoSlug}}/thumbnail
+
+
+### 17. Cancelar um upload em andamento
+DELETE {{baseUrl}}/videos/{{videoId}}/upload
+Authorization: Bearer {{accessToken}}

@@ -713,20 +713,20 @@ Linearized implementation order: SI-03.1 → SI-03.2, SI-03.3, SI-03.4 (parallel
 
 ## Deliverables
 
-- [ ] SI-03.1 — Redis e MinIO no Compose com healthcheck, FFmpeg na imagem, namespaces `storage`/`queue`/`video` validados por Joi
-- [ ] SI-03.2 — `StorageModule` com multipart pré-assinado, leitura por Range e bootstrap idempotente do bucket (CORS + lifecycle)
-- [ ] SI-03.3 — `QueueModule` (BullMQ/Redis) e constantes da fila `video-processing`
-- [ ] SI-03.4 — Entidade `Video` ligada ao canal e migration `CreateVideos`
-- [ ] SI-03.5 — `VideosService` com slug único de 11 chars e transições de status
-- [ ] SI-03.6 — `POST /videos`, `GET /videos/:id`, `GET /videos/:id/upload/parts` (upload de até 10GB direto ao storage, rascunho pré-cadastrado)
-- [ ] SI-03.7 — `POST /videos/:id/upload/complete` (202 + job `video.process`) e `DELETE /videos/:id/upload`
-- [ ] SI-03.8 — Container `video-worker` (segundo entrypoint) e `FfmpegService`
-- [ ] SI-03.9 — Processamento: duração, metadados, thumbnail e `ready`/`failed` com 3 tentativas
-- [ ] SI-03.10 — `GET /videos/:slug/stream` (206), `/download` e `/thumbnail` públicos
-- [ ] SI-03.11 — E2E do pipeline completo (sucesso e falha) e `openapi.json` sincronizado
-- [ ] SI-03.12 — `CLAUDE.md`, README e diagrama coerentes com o código
-- [ ] Unit + integration tests pass (`docker compose exec nestjs-api npm test -- --runInBand`)
-- [ ] E2E tests pass (`docker compose exec nestjs-api npm run test:e2e`)
-- [ ] Type/compilation check passes (`docker compose exec nestjs-api npx tsc --noEmit`)
-- [ ] Lint passes (`docker compose exec nestjs-api npm run lint`)
-- [ ] Project builds successfully (`docker compose exec nestjs-api npm run build`)
+- [x] SI-03.1 — Redis e MinIO no Compose com healthcheck, FFmpeg na imagem, namespaces `storage`/`queue`/`video` validados por Joi
+- [x] SI-03.2 — `StorageModule` com multipart pré-assinado, leitura por Range e bootstrap idempotente do bucket (CORS + lifecycle)
+- [x] SI-03.3 — `QueueModule` (BullMQ/Redis) e constantes da fila `video-processing`
+- [x] SI-03.4 — Entidade `Video` ligada ao canal e migration `CreateVideos`
+- [x] SI-03.5 — `VideosService` com slug único de 11 chars e transições de status
+- [x] SI-03.6 — `POST /videos`, `GET /videos/:id`, `GET /videos/:id/upload/parts` (upload de até 10GB direto ao storage, rascunho pré-cadastrado)
+- [x] SI-03.7 — `POST /videos/:id/upload/complete` (202 + job `video.process`) e `DELETE /videos/:id/upload`
+- [x] SI-03.8 — Container `video-worker` (segundo entrypoint) e `FfmpegService`
+- [x] SI-03.9 — Processamento: duração, metadados, thumbnail e `ready`/`failed` com 3 tentativas
+- [x] SI-03.10 — `GET /videos/:slug/stream` (206), `/download` e `/thumbnail` públicos
+- [x] SI-03.11 — E2E do pipeline completo (sucesso e falha) e `openapi.json` sincronizado
+- [x] SI-03.12 — `CLAUDE.md`, README e diagrama coerentes com o código
+- [x] Unit + integration tests pass (`docker compose exec nestjs-api npm test -- --runInBand`)
+- [x] E2E tests pass (`docker compose exec nestjs-api npm run test:e2e`)
+- [x] Type/compilation check passes (`docker compose exec nestjs-api npx tsc --noEmit`)
+- [x] Lint passes (`docker compose exec nestjs-api npm run lint`)
+- [x] Project builds successfully (`docker compose exec nestjs-api npm run build`)

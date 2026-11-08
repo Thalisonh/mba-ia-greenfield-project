@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
-**Status:** in_progress
-**SIs:** 11/12 completed
+**Status:** completed
+**SIs:** 12/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -82,6 +82,8 @@
   - Request DTOs export without properties (also the Phase 02 ones): `openapi:export` runs under ts-node without the Swagger CLI plugin. Pre-existing, left out of scope.
 
 ### SI-03.12 — Documentação de IA e do projeto para a fase de vídeos
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (documentation); final verification: npm test 254/254, npm run test:e2e 89/89, tsc 0, lint 0 errors, build OK
+- **Observations:** 
+  - Removed `obliterate` from the upload e2e: it wiped the shared queue while the running video-worker held a job.
+  - Verified separately that the `video-worker` container alone takes both the success and failure paths to their final status (temporary copy of the pipeline spec without the in-process worker, not committed).
