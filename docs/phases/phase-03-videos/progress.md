@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 4/12 completed
+**SIs:** 5/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -35,9 +35,11 @@
   - `migrations.integration-spec` dropped FK-related tables with `Promise.all`, which deadlocked once `videos` existed; drops are now sequential.
 
 ### SI-03.5 — VideosService: rascunho com URL única e transições de status
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 17/17 passing (slug.util.spec: 2, videos.service.spec: 4, videos.service.integration-spec: 6, video.entity.integration-spec: 5)
+- **Observations:** 
+  - Queries live in a new `VideosRepository` (not in the plan's action list) to follow the repository pattern required by the challenge and `arch-use-repository-pattern`; `VideosService` holds the rules.
+  - `RangeNotSatisfiableException` is created in SI-03.10, together with the `headers` support it needs.
 
 ### SI-03.6 — Início do upload e URLs de partes (POST /videos, GET /videos/:id, GET /videos/:id/upload/parts)
 - **Status:** pending
