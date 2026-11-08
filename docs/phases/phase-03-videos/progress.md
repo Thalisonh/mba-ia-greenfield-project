@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 10/12 completed
+**SIs:** 11/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -73,9 +73,13 @@
   - Nest's `StreamableFile` only pipes and does not destroy the source when the client disconnects; the controller destroys the storage stream on response close, covered by an e2e test (player seeks would otherwise leak S3 sockets).
 
 ### SI-03.11 — Pipeline ponta a ponta e contrato OpenAPI
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 343 passing no suite completo (npm test: 254; npm run test:e2e: 89, incl. video-pipeline.e2e-spec: 2)
+- **Observations:** 
+  - `npm run test:e2e` did not actually run serially (CLAUDE.md said it did) and failed once there were 6 suites sharing the database; `maxWorkers: 1` now lives in both Jest configs.
+  - Fixed a race found with the real worker running: `complete` built its response after enqueueing, so it could report a status already changed by the worker.
+  - `next-frontend/openapi.json` is gitignored by an existing rule, so only `lib/api/types.gen.ts` is versioned from the sync.
+  - Request DTOs export without properties (also the Phase 02 ones): `openapi:export` runs under ts-node without the Swagger CLI plugin. Pre-existing, left out of scope.
 
 ### SI-03.12 — Documentação de IA e do projeto para a fase de vídeos
 - **Status:** pending

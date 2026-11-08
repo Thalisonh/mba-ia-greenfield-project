@@ -128,4 +128,18 @@ describe('exportSpec (integration)', () => {
       }
     }
   });
+
+  it.each([
+    '/videos',
+    '/videos/{id}',
+    '/videos/{id}/upload/parts',
+    '/videos/{id}/upload/complete',
+    '/videos/{id}/upload',
+    '/videos/{slug}/stream',
+    '/videos/{slug}/download',
+    '/videos/{slug}/thumbnail',
+  ])('documents the %s path', (path) => {
+    const paths = document.paths as Record<string, unknown>;
+    expect(paths[path]).toBeDefined();
+  });
 });

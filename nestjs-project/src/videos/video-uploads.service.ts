@@ -164,6 +164,8 @@ export class VideoUploadsService {
     }
 
     await this.videosService.markProcessing(id, contentLength);
+    // Read before enqueueing: the worker may change the status right after.
+    const processing = toVideoResponse(await this.videosService.getById(id));
     try {
       await this.producer.enqueue(id);
     } catch (error) {
@@ -175,7 +177,7 @@ export class VideoUploadsService {
       throw error;
     }
 
-    return toVideoResponse(await this.videosService.getById(id));
+    return processing;
   }
 
   async cancel(userId: string, id: string): Promise<void> {
