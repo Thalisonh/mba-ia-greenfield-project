@@ -37,6 +37,17 @@ describe('Database migrations (integration)', () => {
       ),
       dataSource.query(`DROP TABLE IF EXISTS "migrations" CASCADE`),
     ]);
+
+    // Migrations also create enum types; leaving them behind makes `up()` fail
+    // with "type ... already exists" on an already-migrated database.
+    const enumTypes = await dataSource.query<{ typname: string }[]>(
+      `SELECT t.typname FROM pg_type t
+       JOIN pg_namespace n ON n.oid = t.typnamespace
+       WHERE t.typtype = 'e' AND n.nspname = 'public'`,
+    );
+    for (const { typname } of enumTypes) {
+      await dataSource.query(`DROP TYPE IF EXISTS "${typname}" CASCADE`);
+    }
   });
 
   afterAll(async () => {
