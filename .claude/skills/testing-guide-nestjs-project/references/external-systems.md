@@ -37,52 +37,15 @@ How each external system is handled in tests. These strategies were confirmed wi
 
 ---
 
-## Object Storage — Local Filesystem
+## Object Storage — Real MinIO (Docker)
 
-**Strategy:** Local filesystem storage in development and tests. S3 in production.
+**Strategy:** Real S3-compatible storage — the `minio` service in `compose.yaml` (S3 in production). Decided in `docs/decisions/technical-decisions-phase-03-videos.md` TD-13: presigned multipart uploads, `Range` reads and bucket lifecycle/CORS only exist on a real S3 API, so a filesystem adapter cannot exercise them.
 
 **Approach:**
-- The storage layer should use an abstraction (e.g., `StorageService` interface) that allows switching between local filesystem and S3
-- In tests, use the local filesystem adapter — no mocking needed
-- Use a temporary directory for test uploads: `os.tmpdir()` or a dedicated `test-uploads/` directory
-- Clean up test files in `afterAll`
-
-**Setup pattern:**
-```typescript
-// In test module setup
-{
-  provide: 'STORAGE_CONFIG',
-  useValue: {
-    driver: 'local',
-    basePath: path.join(os.tmpdir(), 'streamtube-test-uploads'),
-  },
-}
-```
-
-**Integration test:**
-```typescript
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-
-describe('StorageService (integration)', () => {
-  const testDir = path.join(os.tmpdir(), 'streamtube-test-uploads');
-
-  afterAll(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
-  });
-
-  it('should upload and retrieve a file', async () => {
-    const buffer = Buffer.from('test content');
-    const key = await storageService.upload(buffer, 'test.txt');
-
-    const retrieved = await storageService.get(key);
-    expect(retrieved.toString()).toBe('test content');
-  });
-});
-```
-
----
+- Integration and E2E tests use the real `StorageService` against `minio` (`S3_ENDPOINT=http://minio:9000`), with the same bucket as development; every test writes under a unique key prefix (e.g., `videos/<uuid>/...`) and deletes what it created in `afterEach`/`afterAll`.
+- Presigned URLs are signed for `S3_PUBLIC_ENDPOINT` (the browser-facing host). Tests running inside the container override `S3_PUBLIC_ENDPOINT=http://minio:9000` before the module boots so the signed host is reachable from the test process.
+- Test media for FFmpeg is generated at setup with `ffmpeg -f lavfi -i testsrc=...` (no binary fixtures committed).
+- Unit tests mock `StorageService` at the module boundary, as for any other collaborator.
 
 ## Message Queue — Real (Docker)
 
