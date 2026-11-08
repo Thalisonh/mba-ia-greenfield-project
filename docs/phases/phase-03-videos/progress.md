@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 5/12 completed
+**SIs:** 6/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -42,8 +42,8 @@
   - `RangeNotSatisfiableException` is created in SI-03.10, together with the `headers` support it needs.
 
 ### SI-03.6 — Início do upload e URLs de partes (POST /videos, GET /videos/:id, GET /videos/:id/upload/parts)
-- **Status:** pending
-- **Tests:** —
+- **Status:** completed
+- **Tests:** 43 passing (src/videos: 30 incl. video-uploads.service.spec, video-uploads.service.integration-spec, videos.module.spec; videos-upload.e2e-spec: 13)
 - **Observations:** none
 
 ### SI-03.7 — Conclusão e cancelamento do upload com enfileiramento do processamento
