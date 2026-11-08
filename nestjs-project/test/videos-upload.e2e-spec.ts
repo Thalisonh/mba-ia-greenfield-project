@@ -1,9 +1,12 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import { INestApplication } from '@nestjs/common';
+import { Queue } from 'bullmq';
 import { randomBytes, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { putToPresignedUrl } from '../src/test/storage';
+import { VIDEO_PROCESSING_QUEUE } from '../src/videos/videos.constants';
 import { cleanAllTables } from '../src/test/create-test-data-source';
 import {
   createTestUser,
@@ -34,6 +37,9 @@ describe('Videos upload (e2e)', () => {
   });
 
   afterAll(async () => {
+    await app
+      .get<Queue>(getQueueToken(VIDEO_PROCESSING_QUEUE))
+      .obliterate({ force: true });
     await cleanAllTables(app.get(DataSource));
     await app.close();
   });
@@ -193,6 +199,117 @@ describe('Videos upload (e2e)', () => {
       for (let i = 0; i < 15; i++) {
         await getParts(owner.token, body.video.id, 'from=1&to=1').expect(200);
       }
+    });
+  });
+
+  describe('complete and cancel', () => {
+    const authed = (req: request.Test, token: string) =>
+      req.set('Authorization', `Bearer ${token}`);
+
+    /** Starts a one-part upload, sends the bytes and returns what complete needs. */
+    async function uploadSinglePart(declaredSize: number, actualSize: number) {
+      const { body } = await startUpload(owner.token, declaredSize).expect(201);
+      const parts = await authed(
+        request(app.getHttpServer()).get(
+          `/videos/${body.video.id}/upload/parts?from=1&to=1`,
+        ),
+        owner.token,
+      ).expect(200);
+      const upload = await putToPresignedUrl(
+        parts.body.parts[0].url,
+        randomBytes(actualSize),
+      );
+      return {
+        id: body.video.id as string,
+        parts: [{ part_number: 1, etag: upload.headers.get('etag') }],
+      };
+    }
+
+    const complete = (id: string, parts: unknown) =>
+      authed(
+        request(app.getHttpServer()).post(`/videos/${id}/upload/complete`),
+        owner.token,
+      ).send({ parts });
+
+    it('should complete the upload, record the real size and enqueue the job', async () => {
+      const { id, parts } = await uploadSinglePart(2 * MIB, MIB);
+
+      const res = await complete(id, parts).expect(202);
+
+      expect(res.body).toMatchObject({ status: 'processing', size_bytes: MIB });
+      const job = await app
+        .get<Queue>(getQueueToken(VIDEO_PROCESSING_QUEUE))
+        .getJob(id);
+      expect(job?.name).toBe('video.process');
+      expect(job?.data).toEqual({ videoId: id });
+    });
+
+    it('should reject a second complete', async () => {
+      const { id, parts } = await uploadSinglePart(MIB, MIB);
+      await complete(id, parts).expect(202);
+
+      const res = await complete(id, parts).expect(409);
+
+      expect(res.body.error).toBe('VIDEO_NOT_UPLOADABLE');
+    });
+
+    it('should reject a list with missing parts and keep the draft', async () => {
+      const { body } = await startUpload(owner.token).expect(201);
+
+      const res = await complete(body.video.id, [
+        { part_number: 1, etag: 'etag' },
+      ]).expect(400);
+
+      expect(res.body.error).toBe('UPLOAD_INCOMPLETE');
+      const video = await authed(
+        request(app.getHttpServer()).get(`/videos/${body.video.id}`),
+        owner.token,
+      ).expect(200);
+      expect(video.body.status).toBe('draft');
+    });
+
+    it('should reject an ETag the storage does not know', async () => {
+      const { id } = await uploadSinglePart(MIB, MIB);
+
+      const res = await complete(id, [
+        { part_number: 1, etag: '"00000000000000000000000000000000"' },
+      ]).expect(400);
+
+      expect(res.body.error).toBe('UPLOAD_INCOMPLETE');
+    });
+
+    it('should validate the body', async () => {
+      const { body } = await startUpload(owner.token).expect(201);
+
+      const res = await complete(body.video.id, []).expect(400);
+
+      expect(res.body.error).toBe('VALIDATION_ERROR');
+    });
+
+    it('should cancel a draft and forget it', async () => {
+      const { body } = await startUpload(owner.token).expect(201);
+
+      await authed(
+        request(app.getHttpServer()).delete(`/videos/${body.video.id}/upload`),
+        owner.token,
+      ).expect(204);
+
+      await authed(
+        request(app.getHttpServer()).get(`/videos/${body.video.id}`),
+        owner.token,
+      ).expect(404);
+    });
+
+    it('should refuse to cancel a video already processing', async () => {
+      const { id, parts } = await uploadSinglePart(MIB, MIB);
+      await complete(id, parts).expect(202);
+
+      const res = await authed(
+        request(app.getHttpServer()).delete(`/videos/${id}/upload`),
+        owner.token,
+      ).expect(409);
+
+      expect(res.body.error).toBe('VIDEO_NOT_UPLOADABLE');
     });
   });
 });

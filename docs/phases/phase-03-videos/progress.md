@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 6/12 completed
+**SIs:** 7/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -47,9 +47,10 @@
 - **Observations:** none
 
 ### SI-03.7 — Conclusão e cancelamento do upload com enfileiramento do processamento
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 62 passing (src/videos: 42 incl. video-processing.producer.integration-spec; videos-upload.e2e-spec: 20)
+- **Observations:** 
+  - Beyond the plan: if the enqueue fails after `markProcessing`, the video is marked `failed` and the error propagates, otherwise it would stay in `processing` forever.
 
 ### SI-03.8 — Runtime do worker de vídeo e integração com FFmpeg
 - **Status:** pending

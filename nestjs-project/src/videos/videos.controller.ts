@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
@@ -18,6 +20,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { JwtPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
+import { CompleteUploadDto } from './dto/complete-upload.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UploadPartsQueryDto } from './dto/upload-parts-query.dto';
 import { UploadPartsDto } from './dto/upload-parts.dto';
@@ -111,5 +114,50 @@ export class VideosController {
       query.from,
       query.to,
     );
+  }
+
+  @Post(':id/upload/complete')
+  @HttpCode(202)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Complete a video upload',
+    description:
+      'Assembles the uploaded parts on the storage, moves the video to processing and enqueues the background processing job.',
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Upload completed; processing was scheduled',
+    type: VideoResponseDto,
+  })
+  @ApiErrorResponse(400, 'Invalid body, incomplete parts or file too large')
+  @ApiErrorResponse(401, 'Missing or invalid access token')
+  @ApiErrorResponse(404, 'Video not found or owned by another channel')
+  @ApiErrorResponse(409, 'The video is not a draft')
+  completeUpload(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CompleteUploadDto,
+  ): Promise<VideoResponseDto> {
+    return this.videoUploadsService.complete(user.sub, id, dto);
+  }
+
+  @Delete(':id/upload')
+  @HttpCode(204)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Cancel a video upload',
+    description:
+      'Aborts the multipart upload, releasing the uploaded parts, and deletes the draft.',
+  })
+  @ApiResponse({ status: 204, description: 'Upload cancelled' })
+  @ApiErrorResponse(400, 'The id is not a UUID')
+  @ApiErrorResponse(401, 'Missing or invalid access token')
+  @ApiErrorResponse(404, 'Video not found or owned by another channel')
+  @ApiErrorResponse(409, 'The video is not a draft')
+  cancelUpload(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.videoUploadsService.cancel(user.sub, id);
   }
 }

@@ -4,9 +4,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { VerificationToken } from '../auth/entities/verification-token.entity';
 import { Channel } from '../channels/entities/channel.entity';
+import queueConfig from '../config/queue.config';
 import storageConfig from '../config/storage.config';
 import videoConfig from '../config/video.config';
 import { User } from '../users/entities/user.entity';
+import { QueueModule } from '../queue/queue.module';
 import { Video } from './entities/video.entity';
 import { VideoUploadsService } from './video-uploads.service';
 import { VideosModule } from './videos.module';
@@ -18,7 +20,7 @@ describe('VideosModule', () => {
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
-          load: [storageConfig, videoConfig],
+          load: [storageConfig, videoConfig, queueConfig],
         }),
         TypeOrmModule.forRoot({
           type: 'postgres',
@@ -30,6 +32,7 @@ describe('VideosModule', () => {
           entities: [User, Channel, RefreshToken, VerificationToken, Video],
           synchronize: false,
         }),
+        QueueModule,
         VideosModule,
       ],
     }).compile();

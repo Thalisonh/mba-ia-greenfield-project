@@ -1,14 +1,17 @@
+import { S3ServiceException } from '@aws-sdk/client-s3';
 import { Test } from '@nestjs/testing';
 import { ChannelsService } from '../channels/channels.service';
 import {
   ChannelNotFoundException,
   InvalidPartRangeException,
+  UploadIncompleteException,
   VideoFileTooLargeException,
   VideoNotUploadableException,
 } from '../common/exceptions/domain.exception';
 import videoConfig from '../config/video.config';
 import { StorageService } from '../storage/storage.service';
 import { Video, VideoStatus } from './entities/video.entity';
+import { VideoProcessingProducer } from './video-processing.producer';
 import { VideoUploadsService } from './video-uploads.service';
 import { VideosService } from './videos.service';
 
@@ -35,13 +38,24 @@ const draft = (overrides: Partial<Video> = {}): Video =>
 
 describe('VideoUploadsService', () => {
   let service: VideoUploadsService;
-  const videos = { createDraft: jest.fn(), findOwnedById: jest.fn() };
+  const videos = {
+    createDraft: jest.fn(),
+    findOwnedById: jest.fn(),
+    getById: jest.fn(),
+    markProcessing: jest.fn(),
+    markFailed: jest.fn(),
+    remove: jest.fn(),
+  };
+  const producer = { enqueue: jest.fn() };
   const channels = { findByUserId: jest.fn() };
   const storage = {
     createMultipartUpload: jest.fn(),
     abortMultipartUpload: jest.fn(),
     presignUploadPart: jest.fn(),
     listParts: jest.fn(),
+    completeMultipartUpload: jest.fn(),
+    headObject: jest.fn(),
+    deleteObject: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -52,6 +66,7 @@ describe('VideoUploadsService', () => {
         { provide: VideosService, useValue: videos },
         { provide: ChannelsService, useValue: channels },
         { provide: StorageService, useValue: storage },
+        { provide: VideoProcessingProducer, useValue: producer },
         {
           provide: videoConfig.KEY,
           useValue: {
@@ -154,6 +169,126 @@ describe('VideoUploadsService', () => {
 
       expect(result.parts.map((p) => p.part_number)).toEqual([1, 2]);
       expect(storage.presignUploadPart).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('complete', () => {
+    const twoParts = {
+      parts: [
+        { part_number: 1, etag: 'a' },
+        { part_number: 2, etag: 'b' },
+      ],
+    };
+
+    beforeEach(() => {
+      videos.findOwnedById.mockResolvedValue(draft());
+      videos.getById.mockResolvedValue(draft());
+      storage.headObject.mockResolvedValue({ contentLength: 70 * MIB });
+    });
+
+    it.each([
+      ['missing parts', [{ part_number: 1, etag: 'a' }]],
+      [
+        'repeated parts',
+        [
+          { part_number: 1, etag: 'a' },
+          { part_number: 1, etag: 'b' },
+        ],
+      ],
+      [
+        'parts out of range',
+        [
+          { part_number: 1, etag: 'a' },
+          { part_number: 3, etag: 'b' },
+        ],
+      ],
+    ])('should reject %s without calling the storage', async (_name, parts) => {
+      await expect(
+        service.complete('user', 'video-id', { parts }),
+      ).rejects.toBeInstanceOf(UploadIncompleteException);
+      expect(storage.completeMultipartUpload).not.toHaveBeenCalled();
+    });
+
+    it('should map a storage part rejection to UPLOAD_INCOMPLETE', async () => {
+      storage.completeMultipartUpload.mockRejectedValue(
+        new S3ServiceException({
+          name: 'InvalidPart',
+          $fault: 'client',
+          $metadata: {},
+        }),
+      );
+
+      await expect(
+        service.complete('user', 'video-id', twoParts),
+      ).rejects.toBeInstanceOf(UploadIncompleteException);
+      expect(videos.markProcessing).not.toHaveBeenCalled();
+    });
+
+    it('should propagate unexpected storage errors', async () => {
+      const failure = new Error('network');
+      storage.completeMultipartUpload.mockRejectedValue(failure);
+
+      await expect(service.complete('user', 'video-id', twoParts)).rejects.toBe(
+        failure,
+      );
+    });
+
+    it('should delete an assembled object above the limit and mark the video failed', async () => {
+      storage.headObject.mockResolvedValue({ contentLength: 10 * GIB + 1 });
+
+      await expect(
+        service.complete('user', 'video-id', twoParts),
+      ).rejects.toBeInstanceOf(VideoFileTooLargeException);
+      expect(storage.deleteObject).toHaveBeenCalledWith(
+        'videos/video-id/original',
+      );
+      expect(videos.markFailed).toHaveBeenCalled();
+      expect(producer.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('should record the real size and enqueue the processing job', async () => {
+      await service.complete('user', 'video-id', twoParts);
+
+      expect(videos.markProcessing).toHaveBeenCalledWith('video-id', 70 * MIB);
+      expect(producer.enqueue).toHaveBeenCalledWith('video-id');
+    });
+
+    it('should mark the video failed when the job cannot be enqueued', async () => {
+      const failure = new Error('redis down');
+      producer.enqueue.mockRejectedValue(failure);
+
+      await expect(service.complete('user', 'video-id', twoParts)).rejects.toBe(
+        failure,
+      );
+      expect(videos.markFailed).toHaveBeenCalledWith(
+        'video-id',
+        expect.any(String),
+      );
+    });
+  });
+
+  describe('cancel', () => {
+    it('should abort the upload and remove the draft', async () => {
+      videos.findOwnedById.mockResolvedValue(draft());
+
+      await service.cancel('user', 'video-id');
+
+      expect(storage.abortMultipartUpload).toHaveBeenCalledWith(
+        'videos/video-id/original',
+        'upload-id',
+      );
+      expect(videos.remove).toHaveBeenCalledWith('video-id');
+    });
+
+    it('should refuse to cancel a video that is not a draft', async () => {
+      videos.findOwnedById.mockResolvedValue(
+        draft({ status: VideoStatus.PROCESSING, upload_id: null }),
+      );
+
+      await expect(service.cancel('user', 'video-id')).rejects.toBeInstanceOf(
+        VideoNotUploadableException,
+      );
+      expect(videos.remove).not.toHaveBeenCalled();
     });
   });
 });

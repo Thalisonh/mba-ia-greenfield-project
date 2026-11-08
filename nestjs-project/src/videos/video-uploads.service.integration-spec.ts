@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { VerificationToken } from '../auth/entities/verification-token.entity';
 import { Channel } from '../channels/entities/channel.entity';
+import queueConfig from '../config/queue.config';
 import storageConfig from '../config/storage.config';
 import videoConfig from '../config/video.config';
 import { StorageBootstrapService } from '../storage/storage-bootstrap.service';
@@ -16,6 +17,7 @@ import {
   useInternalHostForPresignedUrls,
 } from '../test/storage';
 import { User } from '../users/entities/user.entity';
+import { QueueModule } from '../queue/queue.module';
 import { Video, VideoStatus } from './entities/video.entity';
 import { VideoUploadsService } from './video-uploads.service';
 import { VideosModule } from './videos.module';
@@ -35,7 +37,7 @@ describe('VideoUploadsService (integration)', () => {
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
-          load: [storageConfig, videoConfig],
+          load: [storageConfig, videoConfig, queueConfig],
         }),
         TypeOrmModule.forRoot({
           type: 'postgres',
@@ -47,6 +49,7 @@ describe('VideoUploadsService (integration)', () => {
           entities: [User, Channel, RefreshToken, VerificationToken, Video],
           synchronize: false,
         }),
+        QueueModule,
         VideosModule,
       ],
     }).compile();
