@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 2/12 completed
+**SIs:** 3/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -19,9 +19,12 @@
   - Added a unit spec (`storage-bootstrap.service.spec.ts`) not listed in the plan to cover the supported/unsupported/error branches that real MinIO cannot exercise.
 
 ### SI-03.3 — QueueModule: conexão BullMQ e constantes da fila de vídeo
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 2/2 passing (queue.module.integration-spec.ts); app.e2e-spec.ts 1/1 passing
+- **Observations:** 
+  - `@nestjs/bullmq` changed from ^12 to ^11.0.5: v12 is ESM-only and breaks under the project's CommonJS/Jest setup (Revision on TD-04, library-refs.md corrected).
+  - BullMQ 6 made `ioredis` an optional peer dependency, so `ioredis@^5` was added explicitly (library-refs.md corrected).
+  - BullMQ 6 no longer exposes `queue.client`; connectivity is proven with `waitUntilReady` + `getJobCounts` instead of the literal PING in the AC.
 
 ### SI-03.4 — Entidade Video e migration da tabela `videos`
 - **Status:** pending

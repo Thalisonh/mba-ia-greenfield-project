@@ -13,16 +13,16 @@ libs:
     context7_id: "/taskforcesh/bullmq"
     fetched_at: "2026-11-08T17:11:08-03:00"
   "@nestjs/bullmq":
-    version: "^12.0.1"
+    version: "^11.0.5"
     context7_id: "/nestjs/docs.nestjs.com"
     fetched_at: "2026-11-08T17:11:08-03:00"
 sources_mtime:
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-11-08T17:38:33-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-11-08T17:40:54-03:00"
 ---
 
 # Library References — Phase 03 (videos)
 
-Distilled from Context7 for the surfaces the phase's TDs use. Versions verified on npm on 2026-11-08 (`@aws-sdk/client-s3@3.1164.0` latest; `^3.1160.0` pins to a release ≥ 1 week old; `bullmq@6.7.2`; `@nestjs/bullmq@12.0.1`, peer `@nestjs/core ^10 || ^11 || ^12` — compatible with the installed NestJS 11).
+Distilled from Context7 for the surfaces the phase's TDs use. Versions verified on npm on 2026-11-08 (`@aws-sdk/client-s3@3.1164.0` latest; `^3.1160.0` pins to a release ≥ 1 week old; `bullmq@6.7.2`; `@nestjs/bullmq@11.0.5`, peers `@nestjs/core ^10 || ^11`, `bullmq ^3 || ^4 || ^5 || ^6`. Do **not** use `@nestjs/bullmq@12`: it is ESM-only (`"type": "module"`, built for Nest 12) and fails under this project's CommonJS/Jest setup even though its peer range admits Nest 11).
 
 Non-npm runtime dependencies fixed by the TDs (no Context7 entry needed): **FFmpeg / ffprobe** from the Debian package of the `node:25.6.0-slim` base image (TD-06); **Redis** `redis:8-alpine` (TD-04); **MinIO** `cgr.dev/chainguard/minio@sha256:a1ac4589a5f8136b616e667b48a0bea9719bb10bd45799ea946f24bbedfafde4` — reports `RELEASE.2026-10-23T20-06-51Z` (TD-03).
 
@@ -55,7 +55,7 @@ Used by TD-04, TD-10.
 - Job options on `queue.add(name, data, opts)`: `attempts: 3`, `backoff: { type: 'exponential', delay }`, `jobId` (idempotent enqueue — a job with an existing id is not duplicated), `removeOnComplete` / `removeOnFail`.
 - `UnrecoverableError` thrown from the processor moves the job straight to `failed`, ignoring remaining attempts — used for permanent failures (e.g., ffprobe finds no video stream) so they are not retried.
 - Worker `'failed'` event: `worker.on('failed', (job, error) => …)`; `job.attemptsMade` vs `job.opts.attempts` tells whether this was the final attempt (TD-10 marks the video `failed` only then).
-- Connection: `{ connection: { host, port } }` (ioredis options, bundled dependency).
+- Connection: `{ connection: { host, port } }` (ioredis options). In BullMQ 6 `ioredis` is an **optional peer dependency** — it must be installed explicitly (`ioredis@^5`), and `queue.client` no longer exists (use `waitUntilReady()` and queue commands).
 - `QueueEvents` / `queue.getJobs(['waiting', 'active', ...])` are available for test assertions on enqueued jobs.
 
 ### @nestjs/bullmq

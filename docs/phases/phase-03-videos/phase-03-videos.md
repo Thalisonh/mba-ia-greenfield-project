@@ -3,9 +3,9 @@ kind: phase
 name: phase-03-videos
 test_specs_aware: true
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-11-08T17:38:33-03:00"
-  docs/phases/phase-03-videos/library-refs.md: "2026-11-08T17:38:33-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-11-08T17:38:33-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-11-08T17:42:08-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-11-08T17:42:08-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-11-08T17:40:54-03:00"
 ---
 
 # Phase 03 — Upload e Processamento de Vídeos
@@ -26,7 +26,7 @@ Entregar o upload de vídeos de até 10GB sem travar a API (multipart pré-assin
 
 1. Atualizar `nestjs-project/Dockerfile.dev` — adicionar `ffmpeg` ao `apt install` (fornece `ffmpeg`/`ffprobe` para API, worker e testes) (per `phase-03-videos/TD-06`, `phase-03-videos/TD-13`)
 2. Atualizar `nestjs-project/compose.yaml` — serviço `redis` (`redis:8-alpine`, `redis-server --appendonly yes`, healthcheck `redis-cli ping`, volume `redis-data`) e serviço `minio` (`cgr.dev/chainguard/minio@sha256:a1ac4589a5f8136b616e667b48a0bea9719bb10bd45799ea946f24bbedfafde4`, `server /data --console-address :9001`, portas `9000`/`9001`, `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`, healthcheck `mc ready local` com `MC_HOST_local`, volume `minio-data`); `nestjs-api` passa a depender de ambos `service_healthy` (per `phase-03-videos/TD-03`, `phase-03-videos/TD-04`)
-3. Instalar `@aws-sdk/client-s3@^3.1160.0`, `@aws-sdk/s3-request-presigner@^3.1160.0`, `bullmq@^6.7.0`, `@nestjs/bullmq@^12.0.1` (per `phase-03-videos/TD-01`, `phase-03-videos/TD-04`; versões em `library-refs.md`)
+3. Instalar `@aws-sdk/client-s3@^3.1160.0`, `@aws-sdk/s3-request-presigner@^3.1160.0`, `bullmq@^6.7.0`, `@nestjs/bullmq@^11.0.5` (per `phase-03-videos/TD-01`, `phase-03-videos/TD-04`; versões em `library-refs.md`)
 4. Criar `src/config/storage.config.ts`, `src/config/queue.config.ts`, `src/config/video.config.ts` (`registerAs`) com as chaves e defaults de `### Data Model → Configuration`; registrar no `load` do `ConfigModule` (per `phase-03-videos/TD-15`, convenção herdada de `registerAs` por domínio)
 5. Atualizar `src/config/env.validation.ts` (Joi: `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` obrigatórios, `VIDEO_UPLOAD_PART_SIZE_BYTES` ≥ 5242880, demais com default) e `.env.example` com todas as chaves novas apontando para os nomes de serviço do Compose (`minio`, `redis`)
 

@@ -145,6 +145,9 @@ _Subprojects in scope:_
 
 **Libraries:** bullmq, @nestjs/bullmq
 
+**Revisions:**
+- 2026-11-08 — `@nestjs/bullmq` pinned to `^11.0.5` instead of `12.x`: version 12 is ESM-only (built for Nest 12) and cannot be loaded by this CommonJS/Jest project, although its peer range admits Nest 11; 11.0.5 is CommonJS and accepts `bullmq@^6`. Rationale: found while implementing SI-03.3.
+
 ---
 
 ## TD-05: Video Worker Runtime
