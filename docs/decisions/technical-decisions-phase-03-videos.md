@@ -242,6 +242,7 @@ _Subprojects in scope:_
 
 **Revisions:**
 - 2026-11-08 — Strict BFF (`next-frontend-config-base/TD-03`) governs calls to the NestJS API only; presigned storage URLs are a scoped, short-lived exception: storage CORS is restricted to the frontend origin and exposes the `ETag` header. Rationale: resolves `phase-03-videos` ICC-1 — routing 10GB through the BFF/API would contradict the capability.
+- 2026-11-08 — MinIO has no per-bucket CORS (`PutBucketCors` → `NotImplemented`); locally the restriction to the frontend origin is `MINIO_API_CORS_ALLOW_ORIGIN` in `compose.yaml`, while on S3 the bootstrap applies the bucket CORS rule from `S3_CORS_ALLOWED_ORIGINS`. Rationale: found while implementing SI-03.2 against the real server.
 
 ---
 
@@ -452,6 +453,9 @@ _Subprojects in scope:_
 **Recommendation:** Option A — a cancel endpoint plus a code-applied `AbortIncompleteMultipartUpload` lifecycle rule bounds storage leaks with standard S3 behavior and no scheduler; leftover draft rows are inert and are the natural input of Phase 04's draft management.
 
 **Decision:** A (Cancel endpoint + AbortIncompleteMultipartUpload lifecycle rule)
+
+**Revisions:**
+- 2026-11-08 — On MinIO the `AbortIncompleteMultipartUpload` lifecycle action is rejected (`InvalidArgument`); MinIO purges stale multipart uploads server-side (`stale_uploads_expiry`, verified with `mc admin config get`). The bootstrap still applies the rule on S3 and, on MinIO, relies on `MINIO_API_STALE_UPLOADS_EXPIRY=24h` pinned in `compose.yaml` — same 1-day bound. Rationale: found while implementing SI-03.2 against the real server.
 
 ---
 

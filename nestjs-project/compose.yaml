@@ -62,6 +62,11 @@ services:
       - MINIO_ROOT_USER=streamtube
       - MINIO_ROOT_PASSWORD=streamtube-secret
       - MC_HOST_local=http://streamtube:streamtube-secret@localhost:9000
+      # MinIO has no per-bucket CORS: restrict browser access to the frontend origin here
+      - MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:3001
+      # MinIO rejects the AbortIncompleteMultipartUpload lifecycle action and purges
+      # stale multipart uploads itself — pin the 1-day bound from TD-14
+      - MINIO_API_STALE_UPLOADS_EXPIRY=24h
     volumes:
       - minio-data:/data
     healthcheck:

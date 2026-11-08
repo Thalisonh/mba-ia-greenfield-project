@@ -17,7 +17,7 @@ libs:
     context7_id: "/nestjs/docs.nestjs.com"
     fetched_at: "2026-11-08T17:11:08-03:00"
 sources_mtime:
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-11-08T17:10:08-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-11-08T17:38:33-03:00"
 ---
 
 # Library References — Phase 03 (videos)

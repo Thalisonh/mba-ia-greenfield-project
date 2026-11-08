@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 1/12 completed
+**SIs:** 2/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -12,9 +12,11 @@
   - Added `S3_CORS_ALLOWED_ORIGINS` (derived from TD-07 revision ICC-1) to the TD-15 key set, as documented in the plan's Configuration table.
 
 ### SI-03.2 — StorageModule: cliente S3, multipart, leitura por Range e bootstrap do bucket
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 14/14 passing (storage.service.integration-spec: 6, storage-bootstrap.service.integration-spec: 3, storage-bootstrap.service.spec: 4, storage.module.spec: 1)
+- **Observations:** 
+  - MinIO rejects `PutBucketCors` (NotImplemented) and the `AbortIncompleteMultipartUpload` lifecycle action (InvalidArgument): bootstrap applies both on S3 and, on MinIO, logs a warning and relies on server-level `MINIO_API_CORS_ALLOW_ORIGIN` and `MINIO_API_STALE_UPLOADS_EXPIRY=24h` in compose.yaml. Recorded as Revisions on TD-07 and TD-14; the SI-03.2 AC about the rule being on the bucket applies to S3 only.
+  - Added a unit spec (`storage-bootstrap.service.spec.ts`) not listed in the plan to cover the supported/unsupported/error branches that real MinIO cannot exercise.
 
 ### SI-03.3 — QueueModule: conexão BullMQ e constantes da fila de vídeo
 - **Status:** pending
