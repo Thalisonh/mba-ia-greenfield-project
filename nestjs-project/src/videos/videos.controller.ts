@@ -3,29 +3,41 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiHeader,
   ApiOperation,
+  ApiProduces,
   ApiResponse,
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import type { Response } from 'express';
 import type { JwtPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { CompleteUploadDto } from './dto/complete-upload.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UploadPartsQueryDto } from './dto/upload-parts-query.dto';
 import { UploadPartsDto } from './dto/upload-parts.dto';
 import { VideoResponseDto } from './dto/video-response.dto';
+import { VideoSlugParamDto } from './dto/video-slug-param.dto';
 import { VideoUploadSessionDto } from './dto/video-upload-session.dto';
+import {
+  DeliverableMedia,
+  VideoDeliveryService,
+} from './video-delivery.service';
 import { VideoUploadsService } from './video-uploads.service';
 
 const ApiErrorResponse = (status: number, description: string) =>
@@ -41,7 +53,10 @@ const ApiErrorResponse = (status: number, description: string) =>
 @ApiTags('videos')
 @Controller('videos')
 export class VideosController {
-  constructor(private readonly videoUploadsService: VideoUploadsService) {}
+  constructor(
+    private readonly videoUploadsService: VideoUploadsService,
+    private readonly videoDeliveryService: VideoDeliveryService,
+  ) {}
 
   @Post()
   @ApiBearerAuth('access-token')
@@ -159,5 +174,87 @@ export class VideosController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     return this.videoUploadsService.cancel(user.sub, id);
+  }
+
+  @Public()
+  @Get(':slug/stream')
+  @ApiOperation({
+    summary: 'Stream a video',
+    description:
+      'Progressive playback of a ready video. Honors a single-range Range header with 206 Partial Content.',
+  })
+  @ApiHeader({ name: 'Range', required: false, example: 'bytes=0-1048575' })
+  @ApiProduces('video/*')
+  @ApiResponse({ status: 200, description: 'The whole file' })
+  @ApiResponse({ status: 206, description: 'The requested byte range' })
+  @ApiErrorResponse(400, 'Invalid slug')
+  @ApiErrorResponse(404, 'Video not found or not ready')
+  @ApiErrorResponse(416, 'The range cannot be satisfied')
+  async stream(
+    @Param() { slug }: VideoSlugParamDto,
+    @Headers('range') range: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    return this.send(
+      response,
+      await this.videoDeliveryService.openMedia(slug, range, {
+        attachment: false,
+      }),
+    );
+  }
+
+  @Public()
+  @Get(':slug/download')
+  @ApiOperation({
+    summary: 'Download a video',
+    description:
+      'Sends the original file of a ready video as an attachment. Range requests allow resuming.',
+  })
+  @ApiHeader({ name: 'Range', required: false })
+  @ApiProduces('video/*')
+  @ApiResponse({ status: 200, description: 'The whole file' })
+  @ApiResponse({ status: 206, description: 'The requested byte range' })
+  @ApiErrorResponse(400, 'Invalid slug')
+  @ApiErrorResponse(404, 'Video not found or not ready')
+  @ApiErrorResponse(416, 'The range cannot be satisfied')
+  async download(
+    @Param() { slug }: VideoSlugParamDto,
+    @Headers('range') range: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    return this.send(
+      response,
+      await this.videoDeliveryService.openMedia(slug, range, {
+        attachment: true,
+      }),
+    );
+  }
+
+  @Public()
+  @Get(':slug/thumbnail')
+  @ApiOperation({
+    summary: 'Get a video thumbnail',
+    description: 'Returns the JPEG thumbnail generated from the video.',
+  })
+  @ApiProduces('image/jpeg')
+  @ApiResponse({ status: 200, description: 'The thumbnail' })
+  @ApiErrorResponse(400, 'Invalid slug')
+  @ApiErrorResponse(404, 'Video not found, not ready or without thumbnail')
+  async thumbnail(
+    @Param() { slug }: VideoSlugParamDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    return this.send(
+      response,
+      await this.videoDeliveryService.openThumbnail(slug),
+    );
+  }
+
+  private send(response: Response, media: DeliverableMedia): StreamableFile {
+    response.status(media.statusCode).set(media.headers);
+    // StreamableFile only pipes: without this, every player seek would leave
+    // the storage connection open (S3 bodies must be consumed or destroyed).
+    response.once('close', () => media.stream.destroy());
+    return new StreamableFile(media.stream);
   }
 }

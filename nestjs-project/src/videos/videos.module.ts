@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChannelsModule } from '../channels/channels.module';
 import { StorageModule } from '../storage/storage.module';
 import { Video } from './entities/video.entity';
+import { VideoDeliveryService } from './video-delivery.service';
 import { VideoProcessingProducer } from './video-processing.producer';
 import { VideoUploadsService } from './video-uploads.service';
 import { VIDEO_PROCESSING_QUEUE } from './videos.constants';
@@ -24,6 +25,7 @@ import { VideosService } from './videos.service';
     VideosService,
     VideoUploadsService,
     VideoProcessingProducer,
+    VideoDeliveryService,
   ],
   exports: [VideosService],
 })

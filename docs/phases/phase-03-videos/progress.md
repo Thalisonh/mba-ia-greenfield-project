@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 9/12 completed
+**SIs:** 10/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -67,9 +67,10 @@
   - Orphaned jobs (video row gone) are a no-op, so a stale job cannot loop through retries.
 
 ### SI-03.10 — Streaming com Range, download e thumbnail
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 40 passing (range.util.spec + domain-exception.filter.spec + validation filter: 25; videos-delivery.e2e-spec: 15)
+- **Observations:** 
+  - Nest's `StreamableFile` only pipes and does not destroy the source when the client disconnects; the controller destroys the storage stream on response close, covered by an e2e test (player seeks would otherwise leak S3 sockets).
 
 ### SI-03.11 — Pipeline ponta a ponta e contrato OpenAPI
 - **Status:** pending

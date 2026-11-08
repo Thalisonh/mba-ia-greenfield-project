@@ -3,6 +3,7 @@ export abstract class DomainException extends Error {
     public readonly errorCode: string,
     public readonly httpStatus: number,
     message: string,
+    public readonly headers?: Record<string, string>,
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -94,5 +95,13 @@ export class UploadIncompleteException extends DomainException {
 export class ChannelNotFoundException extends DomainException {
   constructor() {
     super('CHANNEL_NOT_FOUND', 404, 'Channel not found');
+  }
+}
+
+export class RangeNotSatisfiableException extends DomainException {
+  constructor(size: number) {
+    super('RANGE_NOT_SATISFIABLE', 416, 'Requested range is not satisfiable', {
+      'Content-Range': `bytes */${size}`,
+    });
   }
 }
