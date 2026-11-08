@@ -48,6 +48,10 @@ export class VideosService {
     }
   }
 
+  async findById(id: string): Promise<Video | null> {
+    return this.videosRepository.findById(id);
+  }
+
   async getById(id: string): Promise<Video> {
     const video = await this.videosRepository.findById(id);
     if (!video) throw new VideoNotFoundException();

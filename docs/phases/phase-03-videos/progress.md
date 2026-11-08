@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 8/12 completed
+**SIs:** 9/12 completed
 
 ### SI-03.1 — Infraestrutura Docker (Redis, MinIO, FFmpeg) e configuração
 - **Status:** completed
@@ -60,9 +60,11 @@
   - Added `InvalidMediaError` so SI-03.9 can tell unusable files from transient I/O failures.
 
 ### SI-03.9 — Processamento no worker: metadados, thumbnail e ciclo de status
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 22 passing (video-processing.service.spec: 7, video.processor.spec: 5, video.processor.integration-spec: 1, video-processing.service.integration-spec: 3, ffmpeg.service.integration-spec: 5, worker.module.integration-spec: 1)
+- **Observations:** 
+  - Added `video.processor.integration-spec.ts` (not in the plan): a real BullMQ worker confirms the `attemptsMade` semantics that the final-attempt rule depends on — 3 attempts, one `markFailed`.
+  - Orphaned jobs (video row gone) are a no-op, so a stale job cannot loop through retries.
 
 ### SI-03.10 — Streaming com Range, download e thumbnail
 - **Status:** pending
