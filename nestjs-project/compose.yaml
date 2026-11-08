@@ -12,6 +12,10 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
   db:
     image: postgres:17
@@ -33,4 +37,39 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+  minio:
+    # MinIO no longer publishes community images on Docker Hub; Chainguard's free
+    # image is pinned by digest (TD-03 in docs/decisions/technical-decisions-phase-03-videos.md).
+    image: cgr.dev/chainguard/minio@sha256:a1ac4589a5f8136b616e667b48a0bea9719bb10bd45799ea946f24bbedfafde4
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=streamtube
+      - MINIO_ROOT_PASSWORD=streamtube-secret
+      - MC_HOST_local=http://streamtube:streamtube-secret@localhost:9000
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  redis-data:
+  minio-data:
