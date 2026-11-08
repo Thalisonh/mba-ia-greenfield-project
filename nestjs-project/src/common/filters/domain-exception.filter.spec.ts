@@ -5,6 +5,7 @@ import {
   EmailNotConfirmedException,
   InvalidCredentialsException,
   InvalidTokenException,
+  RangeNotSatisfiableException,
   TokenExpiredException,
   TokenReuseDetectedException,
 } from '../exceptions/domain.exception';
@@ -97,5 +98,20 @@ describe('DomainExceptionFilter', () => {
       error: 'TOKEN_REUSE_DETECTED',
       message: expect.any(String),
     });
+  });
+
+  it('applies the headers carried by the exception', () => {
+    const mockSet = jest.fn();
+    const host = {
+      ...mockHost,
+      switchToHttp: () => ({
+        getResponse: () => ({ status: mockStatus, set: mockSet }),
+      }),
+    } as unknown as ArgumentsHost;
+
+    filter.catch(new RangeNotSatisfiableException(100), host);
+
+    expect(mockSet).toHaveBeenCalledWith({ 'Content-Range': 'bytes */100' });
+    expect(mockStatus).toHaveBeenCalledWith(416);
   });
 });

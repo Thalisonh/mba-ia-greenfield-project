@@ -13,6 +13,9 @@ docker compose ps   # all services must show status "running"
 Then verify each infrastructure service is actually ready to accept connections — not just running:
 
 - **PostgreSQL:** `docker compose exec db pg_isready -U streamtube` — expect `accepting connections`
+- **Redis:** `docker compose exec redis redis-cli ping` — expect `PONG`
+- **MinIO:** `docker compose exec minio mc ready local` — expect `The cluster 'local' is ready`
+- **Video worker:** `docker compose logs video-worker` — expect `Video worker started` (it restarts by itself until `npm install` has populated `node_modules`)
 
 Only start the NestJS dev server (`npm run start:dev`) when the user **explicitly** asks to run the application — never as part of "start the environment".
 
@@ -34,6 +37,9 @@ docker compose exec nestjs-api npm run start:dev
 Services:
 - `nestjs-api` — NestJS API, port `3000`
 - `db` — PostgreSQL 17, port `5432`, database `streamtube`, user/password `streamtube`
+- `redis` — Redis 8 (BullMQ broker), port `6379`
+- `minio` — S3-compatible object storage, API port `9000`, console port `9001`, user/password `streamtube`/`streamtube-secret`
+- `video-worker` — background video processor (same image and code as the API, no HTTP port)
 
 All verification and teardown commands run on the **host machine**:
 
@@ -62,11 +68,13 @@ docker compose down
 npm run start:dev                        # Dev server with hot-reload
 npm run build                            # Compile to dist/
 npm run start:prod                       # Run compiled build
+npm run start:worker                     # Video worker with reload (already run by the video-worker service)
+npm run start:worker:prod                # Run the compiled worker (dist/worker)
 
 npm test                                 # Unit tests
 npm run test:watch                       # Unit tests in watch mode
 npm run test:cov                         # Coverage report
-npm run test:e2e                         # End-to-end tests (always with --runInBand)
+npm run test:e2e                         # End-to-end tests (serial, see below)
 
 npx tsc --noEmit                         # Type-check (required before declaring a task done)
 npm run lint                             # ESLint with auto-fix
@@ -84,11 +92,11 @@ curl http://localhost:3000
 
 ### Test execution
 
-Integration and e2e suites share a single test database. They **must** be run with `--runInBand`:
+Integration and e2e suites share a single test database, so they must run serially. Both Jest configs set `maxWorkers: 1`, so the plain commands are enough:
 
 ```bash
-docker compose exec nestjs-api npm test -- --runInBand
-docker compose exec nestjs-api npm run test:e2e   # already configured
+docker compose exec nestjs-api npm test
+docker compose exec nestjs-api npm run test:e2e
 ```
 
 Parallel execution causes FK violations, deadlocks, and cross-suite contamination because suites truncate or seed shared tables concurrently.
@@ -148,6 +156,43 @@ NestJS with standard module structure. Source lives in `src/`, compiled output i
 
 - Each domain feature gets its own module (e.g., `UsersModule`, `VideosModule`) registered in `AppModule`
 - Controllers handle HTTP routing; Services hold business logic; both are scoped to their module
+
+## Videos
+
+Modules:
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `StorageModule` | `src/storage/` | Only gateway to S3/MinIO: multipart, presigned URLs, `Range` reads, bucket bootstrap |
+| `QueueModule` | `src/queue/` | Root BullMQ connection to Redis |
+| `VideosModule` | `src/videos/` | `Video` entity, `VideosRepository`, `VideosService` (lifecycle), `VideoUploadsService` (handshake), `VideoDeliveryService` (streaming), `VideoProcessingProducer`, `VideosController` |
+| `VideoProcessingModule` | `src/video-processing/` | `FfmpegService`, `VideoProcessingService`, `VideoProcessor`. Loaded **only** by `WorkerModule` (`src/worker.ts`), never by the API |
+
+Endpoints (`VideosController`, exempt from the global throttler with `@SkipThrottle()`):
+
+| Route | Access | Purpose |
+|-------|--------|---------|
+| `POST /videos` | Authenticated | Pre-registers the `draft` and opens the multipart upload |
+| `GET /videos/:id` | Owner | Reads the video in any status |
+| `GET /videos/:id/upload/parts?from=&to=` | Owner | Presigned URLs for up to 100 parts + parts already uploaded (resume) |
+| `POST /videos/:id/upload/complete` | Owner | Assembles the parts, status → `processing`, enqueues the job (202) |
+| `DELETE /videos/:id/upload` | Owner | Aborts the multipart upload and deletes the draft (204) |
+| `GET /videos/:slug/stream` | Public | Streaming with `Range` (206) |
+| `GET /videos/:slug/download` | Public | Original file as attachment, `Range` supported |
+| `GET /videos/:slug/thumbnail` | Public | JPEG thumbnail |
+
+Rules that are easy to break:
+
+- **Video bytes never go through the API on upload.** Limits: 10 GiB, 64 MiB parts (`VIDEO_*` env keys).
+- **Status:** `draft → processing → ready | failed`. Only `ready` is delivered. The job is `video.process` on queue `video-processing`, 3 attempts with exponential backoff; `UnrecoverableError` for files that can never work.
+- **Two S3 clients:** `S3_ENDPOINT` (internal I/O, `minio:9000`) and `S3_PUBLIC_ENDPOINT` (browser-facing, used only to sign). SigV4 signs the host, so a URL cannot be rewritten afterwards. Tests inside the container call `useInternalHostForPresignedUrls()` before the module compiles.
+- **MinIO differs from S3 in two places:** no per-bucket CORS and no `AbortIncompleteMultipartUpload` lifecycle action. `StorageBootstrapService` applies both on S3 and, on MinIO, relies on `MINIO_API_CORS_ALLOW_ORIGIN` and `MINIO_API_STALE_UPLOADS_EXPIRY` in `compose.yaml`.
+- **The MinIO image is pinned by digest** (`cgr.dev/chainguard/minio`): `minio/minio` is no longer published on Docker Hub.
+- **Uploaded files are untrusted input to FFmpeg:** keep `-protocol_whitelist`/`-format_whitelist` in `FfmpegService`, and never let the signed URL reach an error message.
+- **Destroy storage streams when the client disconnects** (`VideosController.send`): `StreamableFile` does not do it.
+- **Keep `@nestjs/bullmq` on `^11`:** v12 is ESM-only and does not load in this CommonJS project. `ioredis` is an explicit dependency because BullMQ 6 made it optional.
+- **Tests use the real services:** MinIO, Redis and FFmpeg from Compose; test videos come from `src/test/video-fixture.ts`. Specs that publish jobs without wanting them consumed use a BullMQ `prefix` of their own, because the `video-worker` container shares the real queue.
+- When an endpoint changes: `npm run openapi:export` in the container, then `scripts/sync-openapi.sh` on the host and regenerate `next-frontend/lib/api/types.gen.ts`.
 
 ## Code Conventions
 

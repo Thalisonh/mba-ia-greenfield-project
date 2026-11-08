@@ -18,13 +18,19 @@ This is a monorepo with two main areas:
 
 See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 
-- **Frontend** (Next.js) → calls API via REST, streams from Object Storage
-- **API** (Nest.js) → business rules, auth, reads/writes DB, uploads to storage, publishes jobs to queue, sends emails
-- **Video Worker** (FFmpeg) → consumes jobs from queue, processes videos, updates DB and storage
+- **Frontend** (Next.js) → calls API via REST; uploads video parts directly to Object Storage with presigned URLs; plays video through the API (`Range`/206)
+- **API** (Nest.js) → business rules, auth, reads/writes DB, signs storage uploads and streams from storage, publishes jobs to queue, sends emails
+- **Video Worker** (FFmpeg) → separate `video-worker` container (second entrypoint of `nestjs-project/`); consumes jobs from queue, processes videos, updates DB and storage
 - **Database** (PostgreSQL) → users, channels, videos, comments, likes
 - **Object Storage** (S3/MinIO) → video files and thumbnails
-- **Message Queue** (TBD) → video processing job queue
+- **Message Queue** (Redis + BullMQ) → video processing job queue
 - **Email Service** (SMTP) → account confirmation and password recovery
+
+## Video Pipeline (Phase 03)
+
+`POST /videos` pre-registers a `draft` and opens a multipart upload → the client `PUT`s the parts **directly to object storage** with presigned URLs (video bytes never pass through the API) → `POST /videos/:id/upload/complete` moves the video to `processing` and enqueues `video.process` → the `video-worker` runs `ffprobe`/`ffmpeg` and moves it to `ready` (or `failed`) → `GET /videos/:slug/stream|download|thumbnail` serve it.
+
+Details, endpoints and conventions: `nestjs-project/CLAUDE.md` → "Videos". Decisions: `docs/decisions/technical-decisions-phase-03-videos.md`.
 
 ## Docker Networking
 
